@@ -5,6 +5,11 @@ tools:
   - codebase
   - run_commands
   - github
+  - bash
+  - view
+  - edit
+  - grep
+  - glob
 ---
 
 You are the **Data Steward** for the WRAAWTeam repository.

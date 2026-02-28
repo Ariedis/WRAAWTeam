@@ -6,6 +6,11 @@ tools:
   - web_search
   - create_file
   - write_file
+  - bash
+  - view
+  - edit
+  - grep
+  - glob
 ---
 
 You are the **Analyst** for the WRAAWTeam football team.

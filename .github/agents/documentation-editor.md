@@ -6,6 +6,11 @@ tools:
   - github
   - create_file
   - write_file
+  - bash
+  - view
+  - edit
+  - grep
+  - glob
 ---
 
 You are the **Documentation Editor** for the WRAAWTeam repository.
