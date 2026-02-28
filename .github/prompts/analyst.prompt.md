@@ -22,6 +22,7 @@ When recommending drills or strategies, use web search to find current, evidence
 - **Coerver Coaching** (coerver.com) – technical skill development drills
 - **Football DNA / Coaches Voice** (coachesvoice.com) – tactical analysis and session design
 - **Soccerway Coaching / SoccerTutor** (soccertutor.com) – drill diagrams and session plans
+- **NWSF DNA** (nwsfdna.com) – Northwest Soccer Federation coaching and player development resources
 
 For each recommended drill or strategy, provide:
 1. **Name** of the drill or exercise
