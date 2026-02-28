@@ -31,11 +31,11 @@ jobs:
       - name: Ensure generated file is committed
         run: |
           set -e
-          if git diff --quiet -- data/processed/matches.csv; then
+          if [ -z "$(git status --porcelain -- data/processed/matches.csv)" ]; then
             echo "matches.csv is up to date."
             exit 0
           fi
 
           echo "::error file=data/processed/matches.csv::Processed matches.csv is out of date. Run scripts/dribl_matches_export_to_csv.py and commit the updated data/processed/matches.csv."
-          git --no-pager diff -- data/processed/matches.csv || true
+          git --no-pager diff HEAD -- data/processed/matches.csv || true
           exit 1
