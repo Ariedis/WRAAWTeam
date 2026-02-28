@@ -40,7 +40,7 @@ jobs:
       - name: Commit updated matches.csv (if changed)
         run: |
           set -e
-          if git diff --quiet -- data/processed/matches.csv; then
+          if [ -z "$(git status --porcelain -- data/processed/matches.csv)" ]; then
             echo "No changes to data/processed/matches.csv"
             exit 0
           fi
