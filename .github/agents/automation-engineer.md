@@ -6,6 +6,11 @@ tools:
   - run_commands
   - create_file
   - write_file
+  - bash
+  - view
+  - edit
+  - grep
+  - glob
 ---
 
 You are the **Automation Engineer** for the WRAAWTeam repository.
