@@ -1,0 +1,41 @@
+name: Check matches.csv is up to date
+
+on:
+  pull_request:
+    paths:
+      - "data/raw/dribl/**.xlsx"
+      - "scripts/dribl_matches_export_to_csv.py"
+      - "requirements.txt"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate matches.csv
+        run: |
+          python scripts/dribl_matches_export_to_csv.py
+
+      - name: Ensure generated file is committed
+        run: |
+          set -e
+          if git diff --quiet -- data/processed/matches.csv; then
+            echo "matches.csv is up to date."
+            exit 0
+          fi
+
+          echo "::error file=data/processed/matches.csv::Processed matches.csv is out of date. Run scripts/dribl_matches_export_to_csv.py and commit the updated data/processed/matches.csv."
+          git --no-pager diff -- data/processed/matches.csv || true
+          exit 1
