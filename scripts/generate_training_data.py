@@ -16,6 +16,7 @@ from pathlib import Path
 # Allow importing sibling script
 sys.path.insert(0, str(Path(__file__).parent))
 from generate_insights import (
+    _team_paths,
     load_matches,
     load_notes,
     load_tags,
@@ -127,20 +128,25 @@ def build_notes_list(notes: "pd.DataFrame", fixture_ids: list[str]) -> list[dict
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract training data JSON from match history.")
+    parser.add_argument("--team-dir", type=str, required=True,
+                        help="Path to the team directory (e.g. teams/WRR-AAW).")
     parser.add_argument("--matches", type=int, default=4, help="Last N matches to analyse (default: 4)")
     parser.add_argument("--output", type=str, default="", help="Write JSON to file (default: stdout)")
-    parser.add_argument("--reveal", action="store_true", help="Resolve player IDs to names via secrets/player_id_map.csv")
+    parser.add_argument("--reveal", action="store_true", help="Resolve player IDs to names via <team-dir>/secrets/player_id_map.csv")
     parser.add_argument("--focus", type=str, default="", help="Optional focus area string")
     parser.add_argument("--team", type=str, default="", help="Override team name detection")
     args = parser.parse_args()
 
-    df = load_matches()
-    notes = load_notes()
-    tags = load_tags()
-    players = load_players()
-    attendance = load_attendance()
-    lineups = load_lineups()
-    id_map = load_id_map() if args.reveal else {}
+    team_dir = Path(args.team_dir)
+    paths = _team_paths(team_dir)
+
+    df = load_matches(paths["matches"])
+    notes = load_notes(paths["notes"])
+    tags = load_tags(paths["tags"])
+    players = load_players(paths["players"])
+    attendance = load_attendance(paths["attendance"])
+    lineups = load_lineups(paths["lineups"])
+    id_map = load_id_map(paths["secrets"]) if args.reveal else {}
 
     our_team = detect_team(df, args.team or None)
     played = played_matches(df, our_team)
@@ -154,7 +160,7 @@ def main() -> int:
     has_tags = len(relevant_tags) > 0
 
     # player_notes: check notes/player_notes.csv if it exists
-    player_notes_path = Path("notes/player_notes.csv")
+    player_notes_path = team_dir / "notes" / "player_notes.csv"
     player_notes_list: list[dict] = []
     has_player_notes = False
     if player_notes_path.exists():

@@ -19,13 +19,7 @@ from pathlib import Path
 
 import pandas as pd
 
-MATCHES_PATH    = Path("data/processed/matches.csv")
-NOTES_PATH      = Path("notes/match_notes.csv")
-TAGS_PATH       = Path("notes/match_tags.csv")
 TAG_DICT_PATH   = Path("docs/tag-dictionary.md")
-PLAYERS_PATH    = Path("notes/players.csv")
-ATTENDANCE_PATH = Path("notes/attendance.csv")
-LINEUPS_PATH    = Path("notes/lineups.csv")
 POSITIONS_PATH  = Path("docs/positions.md")
 
 MISSING_NOTES_THRESHOLD_DAYS = 30
@@ -48,6 +42,20 @@ def load_approved_positions(path: Path) -> set[str]:
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="Cross-validate coach notes against matches.csv.")
+    parser.add_argument("--team-dir", type=str, required=True,
+                        help="Path to the team directory (e.g. teams/WRR-AAW).")
+    args = parser.parse_args()
+
+    team_dir = Path(args.team_dir)
+    MATCHES_PATH    = team_dir / "data" / "processed" / "matches.csv"
+    NOTES_PATH      = team_dir / "notes" / "match_notes.csv"
+    TAGS_PATH       = team_dir / "notes" / "match_tags.csv"
+    PLAYERS_PATH    = team_dir / "notes" / "players.csv"
+    ATTENDANCE_PATH = team_dir / "notes" / "attendance.csv"
+    LINEUPS_PATH    = team_dir / "notes" / "lineups.csv"
+
     errors: list[str] = []
     warnings: list[str] = []
 

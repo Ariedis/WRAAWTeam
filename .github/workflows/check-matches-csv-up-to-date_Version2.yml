@@ -3,13 +3,28 @@ name: Check matches.csv is up to date
 on:
   pull_request:
     paths:
-      - "data/raw/dribl/**.xlsx"
+      - "teams/**/data/raw/dribl/**.xlsx"
       - "scripts/dribl_matches_export_to_csv.py"
       - "requirements.txt"
 
 jobs:
-  check:
+  discover-teams:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          teams=$(find teams -maxdepth 1 -mindepth 1 -type d -printf '"%f"\n' | jq -s -c '.')
+          echo "matrix={\"team\":$teams}" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: discover-teams
+    if: ${{ needs.discover-teams.outputs.matrix != '{"team":[]}' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.discover-teams.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,18 +39,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Generate matches.csv
+      - name: Generate matches.csv (${{ matrix.team }})
         run: |
-          python scripts/dribl_matches_export_to_csv.py
+          python scripts/dribl_matches_export_to_csv.py --team-dir teams/${{ matrix.team }}
 
       - name: Ensure generated file is committed
         run: |
           set -e
-          if [ -z "$(git status --porcelain -- data/processed/matches.csv)" ]; then
-            echo "matches.csv is up to date."
+          CSV="teams/${{ matrix.team }}/data/processed/matches.csv"
+          if [ -z "$(git status --porcelain -- "$CSV")" ]; then
+            echo "$CSV is up to date."
             exit 0
           fi
 
-          echo "::error file=data/processed/matches.csv::Processed matches.csv is out of date. Run scripts/dribl_matches_export_to_csv.py and commit the updated data/processed/matches.csv."
-          git --no-pager diff HEAD -- data/processed/matches.csv || true
+          echo "::error file=$CSV::Processed matches.csv is out of date for ${{ matrix.team }}. Run scripts/dribl_matches_export_to_csv.py --team-dir teams/${{ matrix.team }} and commit the result."
+          git --no-pager diff HEAD -- "$CSV" || true
           exit 1

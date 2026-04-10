@@ -3,24 +3,40 @@ name: Validate Dribl XLSX snapshots
 on:
   pull_request:
     paths:
-      - "data/raw/dribl/**.xlsx"
+      - "teams/**/data/raw/dribl/**.xlsx"
   push:
     branches: ["main"]
     paths:
-      - "data/raw/dribl/**.xlsx"
+      - "teams/**/data/raw/dribl/**.xlsx"
 
 jobs:
-  validate:
+  discover-teams:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          teams=$(find teams -maxdepth 1 -mindepth 1 -type d -printf '"%f"\n' | jq -s -c '.')
+          echo "matrix={\"team\":$teams}" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: discover-teams
+    if: ${{ needs.discover-teams.outputs.matrix != '{"team":[]}' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.discover-teams.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate snapshot filenames and size
+      - name: Validate snapshot filenames and size (${{ matrix.team }})
         env:
           MAX_BYTES: "5242880" # 5 MiB
+          TEAM: ${{ matrix.team }}
         run: |
           set -euo pipefail
 
@@ -32,10 +48,10 @@ jobs:
             HEAD_SHA="${{ github.sha }}"
           fi
 
-          files=$(git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" -- 'data/raw/dribl/*.xlsx' || true)
+          files=$(git diff --name-only --diff-filter=AM "$BASE_SHA" "$HEAD_SHA" -- "teams/${TEAM}/data/raw/dribl/*.xlsx" || true)
 
           if [ -z "${files}" ]; then
-            echo "No Dribl XLSX snapshots changed."
+            echo "No Dribl XLSX snapshots changed for team ${TEAM}."
             exit 0
           fi
 

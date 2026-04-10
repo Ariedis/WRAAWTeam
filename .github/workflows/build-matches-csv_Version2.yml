@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "data/raw/dribl/**.xlsx"
+      - "teams/**/data/raw/dribl/**.xlsx"
       - "scripts/dribl_matches_export_to_csv.py"
       - "requirements.txt"
 
@@ -16,8 +16,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  discover-teams:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          teams=$(find teams -maxdepth 1 -mindepth 1 -type d -printf '"%f"\n' | jq -s -c '.')
+          echo "matrix={\"team\":$teams}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: discover-teams
+    if: ${{ needs.discover-teams.outputs.matrix != '{"team":[]}' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{ fromJSON(needs.discover-teams.outputs.matrix) }}
 
     steps:
       - name: Checkout
@@ -33,20 +48,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build processed matches.csv
+      - name: Build processed matches.csv (${{ matrix.team }})
         run: |
-          python scripts/dribl_matches_export_to_csv.py
+          python scripts/dribl_matches_export_to_csv.py --team-dir teams/${{ matrix.team }}
 
       - name: Commit updated matches.csv (if changed)
         run: |
           set -e
-          if [ -z "$(git status --porcelain -- data/processed/matches.csv)" ]; then
-            echo "No changes to data/processed/matches.csv"
+          CSV="teams/${{ matrix.team }}/data/processed/matches.csv"
+          if [ -z "$(git status --porcelain -- "$CSV")" ]; then
+            echo "No changes to $CSV"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/processed/matches.csv
-          git commit -m "Update processed matches.csv"
+          git add "$CSV"
+          git commit -m "Update processed matches.csv for ${{ matrix.team }}"
           git push

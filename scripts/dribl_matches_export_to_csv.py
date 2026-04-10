@@ -10,8 +10,7 @@ from typing import Optional
 import pandas as pd
 
 
-RAW_DIR = Path("data/raw/dribl")
-OUT_PATH = Path("data/processed/matches.csv")
+TEAMS_DIR = Path("teams")
 
 COLUMN_MAP = {
     "Identifier": "fixture_id",
@@ -101,12 +100,20 @@ def coerce_int_series(series: pd.Series) -> pd.Series:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Convert Dribl match export snapshots to a normalized CSV.")
-    parser.add_argument("--input", type=str, default="", help="Optional path to a specific matches_YYYY-MM-DD.xlsx file.")
-    parser.add_argument("--output", type=str, default=str(OUT_PATH), help="Output CSV path.")
+    parser.add_argument("--team-dir", type=str, required=True,
+                        help="Path to the team directory (e.g. teams/WRR-AAW).")
+    parser.add_argument("--input", type=str, default="",
+                        help="Optional path to a specific matches_YYYY-MM-DD.xlsx file.")
+    parser.add_argument("--output", type=str, default="",
+                        help="Output CSV path (default: <team-dir>/data/processed/matches.csv).")
     args = parser.parse_args()
 
-    in_path = Path(args.input) if args.input else find_latest_snapshot(RAW_DIR)
-    out_path = Path(args.output)
+    team_dir = Path(args.team_dir)
+    raw_dir = team_dir / "data" / "raw" / "dribl"
+    default_out = team_dir / "data" / "processed" / "matches.csv"
+
+    in_path = Path(args.input) if args.input else find_latest_snapshot(raw_dir)
+    out_path = Path(args.output) if args.output else default_out
 
     df = pd.read_excel(in_path, engine="openpyxl")
 

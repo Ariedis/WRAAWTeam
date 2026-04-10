@@ -13,47 +13,54 @@ from pathlib import Path
 
 import pandas as pd
 
-MATCHES_PATH    = Path("data/processed/matches.csv")
-NOTES_PATH      = Path("notes/match_notes.csv")
-TAGS_PATH       = Path("notes/match_tags.csv")
-PLAYERS_PATH    = Path("notes/players.csv")
-ATTENDANCE_PATH = Path("notes/attendance.csv")
-LINEUPS_PATH    = Path("notes/lineups.csv")
-SECRETS_PATH    = Path("secrets/player_id_map.csv")
-REPORTS_DIR     = Path("reports")
+TAG_DICT_PATH   = Path("docs/tag-dictionary.md")
 
 OUR_TEAM_CODE = "WRR"  # fallback; auto-detected if possible
+
+
+def _team_paths(team_dir: Path) -> dict:
+    """Return a dict of resolved data paths for a given team directory."""
+    return {
+        "matches":    team_dir / "data" / "processed" / "matches.csv",
+        "notes":      team_dir / "notes" / "match_notes.csv",
+        "tags":       team_dir / "notes" / "match_tags.csv",
+        "players":    team_dir / "notes" / "players.csv",
+        "attendance": team_dir / "notes" / "attendance.csv",
+        "lineups":    team_dir / "notes" / "lineups.csv",
+        "secrets":    team_dir / "secrets" / "player_id_map.csv",
+        "reports":    team_dir / "reports",
+    }
 
 
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_matches() -> pd.DataFrame:
-    df = pd.read_csv(MATCHES_PATH)
+def load_matches(matches_path: Path) -> pd.DataFrame:
+    df = pd.read_csv(matches_path)
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     for col in ("home_score", "away_score"):
         df[col] = pd.to_numeric(df[col], errors="coerce")
     return df.sort_values("date").reset_index(drop=True)
 
 
-def load_notes() -> pd.DataFrame:
-    df = pd.read_csv(NOTES_PATH)
+def load_notes(notes_path: Path) -> pd.DataFrame:
+    df = pd.read_csv(notes_path)
     return df if not df.empty else pd.DataFrame(columns=df.columns)
 
 
-def load_tags() -> pd.DataFrame:
-    df = pd.read_csv(TAGS_PATH)
+def load_tags(tags_path: Path) -> pd.DataFrame:
+    df = pd.read_csv(tags_path)
     if "count" not in df.columns:
         df["count"] = 1
     df["count"] = pd.to_numeric(df["count"], errors="coerce").fillna(1)
     return df if not df.empty else pd.DataFrame(columns=df.columns)
 
 
-def load_players() -> pd.DataFrame:
-    if not PLAYERS_PATH.exists():
+def load_players(players_path: Path) -> pd.DataFrame:
+    if not players_path.exists():
         return pd.DataFrame(columns=["player_id", "squad_number", "primary_position", "preferred_positions", "active"])
-    df = pd.read_csv(PLAYERS_PATH)
+    df = pd.read_csv(players_path)
     if df.empty:
         return df
     if "active" in df.columns:
@@ -62,10 +69,10 @@ def load_players() -> pd.DataFrame:
     return df
 
 
-def load_attendance() -> pd.DataFrame:
-    if not ATTENDANCE_PATH.exists():
+def load_attendance(attendance_path: Path) -> pd.DataFrame:
+    if not attendance_path.exists():
         return pd.DataFrame(columns=["session_date", "session_type", "fixture_id", "player_id", "status"])
-    df = pd.read_csv(ATTENDANCE_PATH)
+    df = pd.read_csv(attendance_path)
     if df.empty:
         return df
     df["session_date"] = pd.to_datetime(df["session_date"], errors="coerce")
@@ -73,20 +80,20 @@ def load_attendance() -> pd.DataFrame:
     return df
 
 
-def load_lineups() -> pd.DataFrame:
-    if not LINEUPS_PATH.exists():
+def load_lineups(lineups_path: Path) -> pd.DataFrame:
+    if not lineups_path.exists():
         return pd.DataFrame(columns=["fixture_id", "position_slot", "player_id", "notes"])
-    df = pd.read_csv(LINEUPS_PATH)
+    df = pd.read_csv(lineups_path)
     if df.empty:
         return df
     df["player_id"] = df["player_id"].astype(str)
     return df
 
 
-def load_id_map() -> dict[str, str]:
-    if not SECRETS_PATH.exists():
+def load_id_map(secrets_path: Path) -> dict[str, str]:
+    if not secrets_path.exists():
         return {}
-    df = pd.read_csv(SECRETS_PATH)
+    df = pd.read_csv(secrets_path)
     if df.empty or "player_id" not in df.columns or "player_name" not in df.columns:
         return {}
     return {str(row["player_id"]): str(row["player_name"]) for _, row in df.iterrows()}
@@ -412,15 +419,16 @@ def section_coach_focus(notes: pd.DataFrame, n: int = 3) -> str | None:
 # Main
 # ---------------------------------------------------------------------------
 
-def build_report(team_hint: str | None, id_map: dict | None = None) -> str:
+def build_report(team_dir: Path, team_hint: str | None, id_map: dict | None = None) -> str:
     if id_map is None:
         id_map = {}
-    df = load_matches()
-    notes = load_notes()
-    tags = load_tags()
-    players = load_players()
-    attendance = load_attendance()
-    lineups = load_lineups()
+    paths = _team_paths(team_dir)
+    df = load_matches(paths["matches"])
+    notes = load_notes(paths["notes"])
+    tags = load_tags(paths["tags"])
+    players = load_players(paths["players"])
+    attendance = load_attendance(paths["attendance"])
+    lineups = load_lineups(paths["lineups"])
 
     our_team = detect_team(df, team_hint)
     played = played_matches(df, our_team)
@@ -455,17 +463,22 @@ def build_report(team_hint: str | None, id_map: dict | None = None) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a Markdown insights report.")
-    parser.add_argument("--output", type=str, default="", help="Output path (default: reports/insights_YYYY-MM-DD.md).")
+    parser.add_argument("--team-dir", type=str, required=True,
+                        help="Path to the team directory (e.g. teams/WRR-AAW).")
+    parser.add_argument("--output", type=str, default="",
+                        help="Output path (default: <team-dir>/reports/insights_YYYY-MM-DD.md).")
     parser.add_argument("--team", type=str, default="", help="Our team name (auto-detected if omitted).")
     parser.add_argument("--reveal", action="store_true",
-        help="Replace player IDs with real names using secrets/player_id_map.csv")
+        help="Replace player IDs with real names using <team-dir>/secrets/player_id_map.csv")
     args = parser.parse_args()
 
-    id_map = load_id_map() if args.reveal else {}
-    report = build_report(args.team or None, id_map=id_map)
+    team_dir = Path(args.team_dir)
+    paths = _team_paths(team_dir)
+    id_map = load_id_map(paths["secrets"]) if args.reveal else {}
+    report = build_report(team_dir, args.team or None, id_map=id_map)
 
     today_str = date.today().isoformat()
-    out_path = Path(args.output) if args.output else REPORTS_DIR / f"insights_{today_str}.md"
+    out_path = Path(args.output) if args.output else paths["reports"] / f"insights_{today_str}.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
     print(f"Report written to {out_path}")
